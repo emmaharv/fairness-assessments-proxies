@@ -8,8 +8,9 @@ source("load_libraries_utilities.R")
 
 ## SETUP
 
-## Set population size
-pop.size <- 5000
+## Set population size & share RED
+pop.size <- 100000
+pop.share.red = 0.5
 
 ## Set the predicted & actual probability of a "good" outcome for members of the GREEN group: 
 ## 40% and 50%, respectively
@@ -23,9 +24,11 @@ actual.red <- 0.6
 
 ## Define situations to assess
 situations <- list(
-  list(name="Very Small, Balanced Disparity", pop.share.red=0.5, red.share.x1=0.99, green.share.x1=0.01),
-  list(name="Small, Balanced Disparity with Unequal Group Sizes", pop.share.red=0.2, red.share.x1=0.9, green.share.x1=0.1),
-  list(name="Medium, Unbalanced Disparity", pop.share.red=0.5, red.share.x1=0.99, green.share.x1=0.5))
+  list(name="Randomly Assigned Perfect Identifier", red.share.x1=0.03, green.share.x1=0),
+  list(name="Randomly Assigned Near-Perfect Identifier", red.share.x1=0.03, green.share.x1=0.0003),
+  list(name="Randomly Assigned Less-Perfect Identifier", red.share.x1=0.03, green.share.x1=0.003), 
+  list(name="Perfect Identifier Associated with a True Positive", red.share.x1=0.03, green.share.x1=0),
+  list(name="Perfect Identifier Associated with a False Negative", red.share.x1=0.03, green.share.x1=0))
 
 situations <- as.data.frame(do.call(rbind, situations))
 situations <- situations %>% mutate_all(unlist)
@@ -34,11 +37,10 @@ situations <- situations %>% mutate_all(unlist)
 for (i in 1:nrow(situations)) {
   
   name <- situations[i, "name"]
-  pop.share.red <- situations[i, "pop.share.red"] ## share of the population in the RED group
   red.share.x1 <- situations[i, "red.share.x1"] ## share of the RED group with characteristic X1
   green.share.x1 <- situations[i, "green.share.x1"] ## share of the GREEN group with characteristic X1
   
-  ## GENERATE DATA
+  # GENERATE DATA
   
   ## Create a demographic summary table (share of individuals with each trait)
   demographic.summary.table <- data.frame(Color=c("Red", "Green"), X1=c(red.share.x1, green.share.x1))
@@ -71,6 +73,17 @@ for (i in 1:nrow(situations)) {
     mutate(Pred_Outcome = ifelse(ID %in% predicted.yes, 1, 0), 
            Actual_Outcome = ifelse(ID %in% actual.yes, 1, 0))
   
+  ## Correlate the characteristic with a true positive according to the scenario
+  if (name == "Perfect Identifier Associated with a False Negative") {
+    red = red %>%
+      mutate(Characteristic = ifelse(Pred_Outcome == 0 & Actual_Outcome == 1, Characteristic, 
+                                     ifelse(runif(pop.size) < 0.3, Characteristic, "X2")))
+  } else if (name == "Perfect Identifier Associated with a True Positive") {
+    red = red %>%
+      mutate(Characteristic = ifelse(Pred_Outcome == 1 & Actual_Outcome == 1, Characteristic, 
+                                     ifelse(runif(pop.size) < 0.3, Characteristic, "X2")))
+  }
+  
   ## Combine to create full population
   pop <- rbind(green[sample(1:nrow(green), nrow(green) * (1 - pop.share.red)),], 
                red[sample(1:nrow(red), nrow(red) * (pop.share.red)),])
@@ -84,57 +97,9 @@ for (i in 1:nrow(situations)) {
   
   true.tprd <- true.tpr.red - true.tpr.green
   
-  ## Complete the demographic summary table - all individuals who don't display characteristic X1 
-  ## display characteristic X2
-  demographic.summary.table$X2 <- 1 - demographic.summary.table$X1
-  demographic.summary.table <- gather(demographic.summary.table, key="Characteristic", value="Proportion", 2:3)
+  out.dat <- pop %>% mutate(
+    tp = Actual_Outcome == 1 & Pred_Outcome == 1,
+    pred.color = ifelse(Characteristic == "X1", "red", "green"))
   
-  ## Measure accuracy of estimated TPRD at different assumed proportions of RED individuals in the 
-  ## population
-  tprd.delta <- data.frame()
-  for (est.pop.share.red in seq(0, 1, 0.01)) {
-    
-    print(est.pop.share.red)
-    
-    ## Create priors 
-    priors <- data.frame("Prior"=c(0 + est.pop.share.red, 1 - est.pop.share.red), "Color"= c("Red", "Green"))
-    
-    ## Use demographic summary table + priors to create conditionals
-    conditionals <- left_join(demographic.summary.table, priors, by="Color")
-    conditionals <- conditionals %>% 
-      group_by(Characteristic) %>%
-      mutate(Weighted_Avg = weighted.mean(Proportion, Prior)) %>%
-      ungroup() %>%
-      mutate(Conditional = (Prior * Proportion) / Weighted_Avg)
-    
-    conditionals <- conditionals %>% filter(Color == "Red") %>% select(Characteristic, Conditional)
-    
-    tprd.accuracy.check <- pop %>% left_join(conditionals, by=c("Characteristic"))
-    
-    ## Repeat each check 10 times
-    for (j in 1:10) {
-      
-      ## Randomly assign individuals to be RED or GREEN based on their probability of being RED
-      tprd.accuracy.check$Red_Probability <- runif(nrow(tprd.accuracy.check))
-      tprd.accuracy.check <- tprd.accuracy.check %>%
-        mutate(Predicted_Color = ifelse(Red_Probability < Conditional, "Red", "Green"))
-      
-      est.tpr.red <- nrow(tprd.accuracy.check %>% filter(Actual_Outcome == 1 & Pred_Outcome == 1 & Predicted_Color == "Red")) / 
-        nrow(tprd.accuracy.check %>% filter(Actual_Outcome == 1 & Predicted_Color == "Red"))
-      
-      est.tpr.green <- nrow(tprd.accuracy.check %>% filter(Actual_Outcome == 1 & Pred_Outcome == 1 & Predicted_Color == "Green")) / 
-        nrow(tprd.accuracy.check %>% filter(Actual_Outcome == 1 & Predicted_Color == "Green"))
-      
-      color.accuracy <- nrow(tprd.accuracy.check %>% filter(Color == Predicted_Color)) / nrow(tprd.accuracy.check)
-      
-      ## Calculate estimated TPRD
-      est.tprd <- est.tpr.red - est.tpr.green
-      
-      tprd.delta <- rbind(data.frame(est.pop.share.red=est.pop.share.red, est.tprd=est.tprd, 
-                                     color.accuracy=color.accuracy), 
-                          tprd.delta)
-    }
-  }
-  write.csv(tprd.delta, paste0("Data/Simulated/", name, ".csv"), row.names=F)
+  write.csv(out.dat, paste0("data/simulated/", name, ".csv"), row.names=F)
 }
-

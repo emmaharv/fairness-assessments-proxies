@@ -154,5 +154,5 @@ for (i in 1:nrow(situations)) {
     summarise_all(function(x) round(mean(x), 2)) %>%
     mutate(tprd.disparity = true.tprd - est.tprd)
   
-  write.csv(tprd.delta, paste0("Data/Simulated/", name, ".csv"), row.names=F)
+  write.csv(tprd.delta, paste0("data/simulated/", name, ".csv"), row.names=F)
 }

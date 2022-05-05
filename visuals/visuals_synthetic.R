@@ -27,7 +27,7 @@ for (i in 1:nrow(situations)) {
   subtitle <- situations[i, "subtitle"] 
   
   ## Read data
-  dat <- read.csv(paste0("Data/Simulated/", name, ".csv"))
+  dat <- read.csv(paste0("data/simulated/", name, ".csv"))
   dat <- dat %>% group_by(est.pop.share.red) %>% summarise_all(mean) %>% ungroup() 
   
   ## Set intercept values for graph
@@ -53,7 +53,7 @@ for (i in 1:nrow(situations)) {
           axis.text = element_text(size=10), 
           legend.text = element_text(size=10))
   
-  ggsave(filename=paste0("Visuals/", name, ".pdf"), plot=plot1, device="pdf", height=4, width=4, 
+  ggsave(filename=paste0("img/", name, ".pdf"), plot=plot1, device="pdf", height=4, width=4, 
          units="in", dpi=500)
 }
 
@@ -78,7 +78,7 @@ for (i in 1:nrow(situations)) {
   subtitle <- situations[i, "subtitle"] 
   
   ## Read data
-  dat <- read.csv(paste0("Data/Simulated/", name, ".csv"))
+  dat <- read.csv(paste0("data/simulated/", name, ".csv"))
   
   ## Set intercept values for graph
   intercepts1 <- data.frame(y1=true.tprd)
@@ -100,7 +100,7 @@ for (i in 1:nrow(situations)) {
           axis.text = element_text(size=10), 
           legend.text = element_text(size=10))
   
-  ggsave(filename=paste0("Visuals/", name, ".pdf"), plot=plot1, device="pdf", height=4, width=4, 
+  ggsave(filename=paste0("img/", name, ".pdf"), plot=plot1, device="pdf", height=4, width=4, 
          units="in", dpi=500)
 }
 
@@ -124,7 +124,7 @@ for (i in 1:nrow(situations)) {
   name <- situations[i, "name"]
   
   ## Read data
-  dat <- read.csv(paste0("Data/Simulated/", name, ".csv"))
+  dat <- read.csv(paste0("data/simulated/", name, ".csv"))
   
   ## Calculate TPRD metrics
   tpr.red = nrow(dat %>% filter(Actual_Outcome == 1 & Pred_Outcome == 1 & Color == "Red")) / 
@@ -172,7 +172,7 @@ for (i in 1:nrow(situations)) {
           axis.text = element_text(size=10), 
           legend.text = element_text(size=10))
   
-  ggsave(filename=paste0("Visuals/", name, ".pdf"), plot=plot1, device="pdf", height=5, width=5, 
+  ggsave(filename=paste0("img/", name, ".pdf"), plot=plot1, device="pdf", height=5, width=5, 
          units="in", dpi=500)
   
 }
